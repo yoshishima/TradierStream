@@ -50,5 +50,5 @@ Contributions to the project are welcome. Please follow the standard fork-branch
 This project is licensed under the GPL3 License.
 
 ## Acknowledgments
-Tradier API documentation: Tradier Documentation
+Tradier API documentation: Tradier Documentation  
 .NET documentation: Microsoft .NET Docs
