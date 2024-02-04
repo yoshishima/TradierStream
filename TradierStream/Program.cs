@@ -1,60 +1,71 @@
 ﻿using Microsoft.Extensions.Configuration;
-using System.Text.Json;
 using TradierStream.Tradier;
 
-namespace TradierStream
+namespace TradierStream;
+
+/// <summary>
+/// Represents the entry point and main class for the TradierStream application.
+/// </summary>
+internal class Program
 {
-    internal class Program
+    /// <summary>
+    /// Entry point for the application.
+    /// </summary>
+    /// <param name="args">Command line arguments.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    private static async Task Main()
     {
-        static async Task Main(string[] args)
+        var builder = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", true, true);
+
+
+        IConfiguration configuration = builder.Build();
+
+        var WebSocketUrl = configuration["ApplicationSettings:WebSocketUrl"];
+        var sessionURL = configuration["ApplicationSettings:SessionURL"];
+        var token = configuration["UserSettings:BearerToken"];
+
+
+        var sessionId = "";
+        //list of symbols or options to stream
+        string[] symbols = { "SPY", "QQQ" };
+        string[] filters = { "All" };
+        var linebreak = false;
+        var validOnly = false;
+        var advancedDetails = false;
+
+
+        // Get session ID from Tradier
+        try
         {
-            var builder = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
-
-
-            IConfiguration configuration = builder.Build();
-            var WebSocketUrl = configuration["ApplicationSettings:WebSocketUrl"];
-            var sessionURL = configuration["ApplicationSettings:SessionURL"];
-            var token = configuration["UserSettings:BearerToken"];
-            
-            string sessionId = "";
-            //list of symbols or options to stream
-            string[] symbols = { "SPY", "QQQ" };
-            string[] filters = { "All" };
-            bool linebreak = false;
-            bool validOnly = false;
-            bool advancedDetails = false;
-
-
-            // Get session ID from Tradier
-            try
-            {
-                string response = await TradierAuth.SendPostRequest(sessionURL, token);
-                sessionId = TradierAuth.ExtractSessionId(response);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"An error occurred: {ex.Message}");
-            }
-
-
-
-            // Build JSON string to send to Tradier websocket
-            string jsonString = TradierWebSocket.JsonBuilder.BuildJsonString(symbols, sessionId, filters,linebreak,validOnly,advancedDetails); ;
-
-            // Connect to Tradier websocket
-            await TradierWebSocket.ConnectToWebSocket(WebSocketUrl, sessionId, jsonString);
+            var response = await TradierAuth.SendPostRequest(sessionURL, token);
+            sessionId = TradierAuth.ExtractSessionId(response);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred: {ex.Message}");
         }
 
+        var jsonString =
+            TradierWebSocket.JsonBuilder.BuildJsonString(symbols, sessionId, filters, linebreak, validOnly,
+                advancedDetails);
+        ;
 
-    }
+        var client = new TradierWebSocket(WebSocketUrl, sessionId);
+        var connected = await client.ConnectAsync();
 
+        if (connected) await client.SubscribeToSymbolsAsync(jsonString);
 
+        Task.Run(async () => await client.StartReceivingAsync());
+        Console.WriteLine("Press 'q' to quit.");
+        while (Console.ReadKey().KeyChar != 'q')
+        {
+            Console.WriteLine("Running... Press 'q' to quit.");
+            Thread.Sleep(1000);
+        }
         
-
-
-
-    
-
+        client.DisconnectAsync();
+        await Task.Delay(1000);
+    }
 }
