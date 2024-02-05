@@ -58,6 +58,7 @@ internal class Program
         if (connected) await client.SubscribeToSymbolsAsync(jsonString);
 
         Task.Run(async () => await client.StartReceivingAsync());
+        
         Console.WriteLine("Press 'q' to quit.");
         while (Console.ReadKey().KeyChar != 'q')
         {
